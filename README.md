@@ -19,11 +19,22 @@ BeamerFix erzwingt genau diesen Modus.
 | **Klick** auf das Menüleisten-Symbol | Alle externen Displays → 1920 × 1080 @ 60 Hz ohne HiDPI (Fallback: 1280 × 720) |
 | Rückfrage „Ist das Bild jetzt in Ordnung?“ | Bestätigen, sonst wird nach 15 s automatisch zurückgestellt |
 | **Nochmal klicken** (Symbol zeigt ✓) | Alles wie vorher |
+| **Rechtsklick → Beamer 16:10 (1920 × 1200)** | Für Beamer mit WUXGA-Panel, direkt per HDMI angeschlossen – passt zum 16:10 des MacBooks, keine Balken |
 | **Rechtsklick** | „Bei Anmeldung starten“ an/aus · Beenden |
 
 Änderungen gelten nur bis zum Abstecken bzw. Abmelden – BeamerFix verstellt nichts dauerhaft.
 
+**Welche Auflösung wann?** Konferenzraum-Systeme (Teams Rooms, Zoom Rooms, Capture-Karten) arbeiten
+intern mit 1080p – dafür ist der normale Klick da. 1920 × 1200 nur bei einem Beamer ohne Raumsystem
+dazwischen. 4K ist bewusst nicht dabei: Am Ingest ist es gerade das Problem, an einem direkt
+angeschlossenen 4K-TV macht macOS es selbst richtig.
+
 ## Installation
+
+**Einfach:** Unter [Releases](https://github.com/tobymarks/beamerfix/releases/latest) `BeamerFix.zip`
+laden, entpacken, nach *Programme* ziehen. Signiert und von Apple notarisiert – keine Warnung beim Start.
+
+**Aus dem Quellcode:**
 
 ```sh
 git clone https://github.com/tobymarks/beamerfix.git
@@ -34,8 +45,15 @@ cd beamerfix
 Voraussetzungen: macOS 13 oder neuer, Xcode Command Line Tools (`xcode-select --install`).
 Das Ergebnis ist ein Universal-Binary (Apple Silicon + Intel).
 
-Die App ist nur ad-hoc signiert. Auf einem anderen Mac beim ersten Start **Rechtsklick → Öffnen**
-oder `xattr -dr com.apple.quarantine /Applications/BeamerFix.app`.
+Ein lokaler Build ist nur ad-hoc signiert und läuft ohne Warnung nur auf dem Mac, auf dem er gebaut
+wurde. Für eine weitergebbare Version:
+
+```sh
+# einmalig: API-Key aus App Store Connect als notarytool-Profil hinterlegen
+xcrun notarytool store-credentials beamerfix-notary --key AuthKey_XXX.p8 --key-id XXX --issuer <Issuer-UUID>
+
+./build.sh release        # Developer ID signieren, notarisieren, stapeln → build/BeamerFix.zip
+```
 
 ## Kommandozeilen-Tool
 

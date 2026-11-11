@@ -69,7 +69,7 @@ enum Displays {
 // Bedienung: EIN Klick aufs Menüleisten-Symbol.
 //   1. Klick  → alle externen Displays auf 1920×1080 @ 60 Hz (ohne HiDPI), sonst 1280×720
 //   2. Klick  → wieder wie vorher
-//   Rechtsklick → Bei Anmeldung starten (an/aus), Beenden
+//   Rechtsklick → Beamer 16:10 (1920×1200), Bei Anmeldung starten (an/aus), Beenden
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
@@ -97,6 +97,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func clicked() {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
+            menu.autoenablesItems = false   // sonst überschreibt AppKit isEnabled
+            let beamer = menu.addItem(withTitle: "Beamer 16:10 (1920 × 1200)", action: #selector(fixBeamer), keyEquivalent: "")
+            beamer.target = self
+            beamer.isEnabled = Displays.external().contains { Displays.find($0, w: 1920, h: 1200) != nil }
+            menu.addItem(.separator())
             let login = menu.addItem(withTitle: "Bei Anmeldung starten", action: #selector(toggleLogin), keyEquivalent: "")
             login.target = self
             switch SMAppService.mainApp.status {
@@ -111,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.menu = nil
             return
         }
-        originals.isEmpty ? fix() : undo()
+        originals.isEmpty ? fix(Self.roomTargets) : undo()
     }
 
     @objc private func toggleLogin() {
@@ -132,27 +137,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func fix() {
+    /// Konferenzraum-Ingest (Teams/Zoom Rooms, Capture-Karten): 1080p, Fallback 720p.
+    static let roomTargets = [(1920, 1080), (1280, 720)]
+    /// Beamer mit WUXGA-Panel (16:10) – passt zum MacBook-Seitenverhältnis.
+    static let beamerTargets = [(1920, 1200)]
+
+    @objc private func fixBeamer() { fix(Self.beamerTargets) }
+
+    private func fix(_ targets: [(Int, Int)]) {
         let ext = Displays.external()
         guard !ext.isEmpty else { return alert("Kein externes Display gefunden.", "Ist das Kabel eingesteckt?") }
 
-        var before: [CGDirectDisplayID: Mode] = [:]
+        var previous: [CGDirectDisplayID: Mode] = [:]   // Stand direkt vor diesem Versuch
         var applied: [String] = []
         for id in ext {
             guard let cur = Displays.current(id),
-                  let target = Displays.find(id, w: 1920, h: 1080) ?? Displays.find(id, w: 1280, h: 720)
+                  let target = targets.lazy.compactMap({ Displays.find(id, w: $0.0, h: $0.1) }).first
             else { continue }
-            before[id] = cur
+            previous[id] = cur
             if Displays.apply(target, to: id) { applied.append("\(Displays.name(id)): \(target.label)") }
         }
         guard !applied.isEmpty else {
-            return alert("Keine passende Auflösung gefunden.", "Das Display bietet weder 1080p noch 720p an.")
+            let list = targets.map { "\($0.0) × \($0.1)" }.joined(separator: " / ")
+            return alert("Keine passende Auflösung gefunden.", "Das Display bietet \(list) nicht an.")
         }
 
         if confirm(applied.joined(separator: "\n")) {
-            originals = before
+            // Ursprungszustand nur beim ersten Mal merken – „Rückgängig“ führt immer ganz zurück.
+            for (id, mode) in previous where originals[id] == nil { originals[id] = mode }
         } else {
-            before.forEach { Displays.apply($0.value, to: $0.key) }
+            previous.forEach { Displays.apply($0.value, to: $0.key) }
         }
         updateIcon()
     }

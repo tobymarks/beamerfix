@@ -1,9 +1,18 @@
 #!/bin/zsh
 # Baut build/BeamerFix.app (Universal: Apple Silicon + Intel, ad-hoc signiert)
 # und das Kommandozeilen-Tool build/beamerfix.
-#   ./build.sh            nur bauen
+#   ./build.sh            nur bauen (ad-hoc signiert, nur für diesen Mac)
 #   ./build.sh install    bauen und nach /Applications kopieren
+#   ./build.sh release    mit Developer ID signieren, notarisieren, stapeln → build/BeamerFix.zip
+#   ./build.sh release install
+#
+# Release braucht: ein „Developer ID Application“-Zertifikat im Schlüsselbund und ein
+# notarytool-Profil (einmalig):
+#   xcrun notarytool store-credentials beamerfix-notary --key AuthKey_XXX.p8 --key-id XXX --issuer <UUID>
+# Überschreibbar per Umgebung: SIGN_ID, NOTARY_PROFILE
 set -e
+RELEASE=0; INSTALL=0
+for a in "$@"; do [[ $a == release ]] && RELEASE=1; [[ $a == install ]] && INSTALL=1; done
 cd "$(dirname "$0")"
 APP=build/BeamerFix.app
 TMP=$(mktemp -d)
@@ -30,19 +39,41 @@ cat > $APP/Contents/Info.plist <<PLIST
   <key>CFBundleExecutable</key><string>BeamerFix</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.1</string>
-  <key>CFBundleVersion</key><string>2</string>
+  <key>CFBundleShortVersionString</key><string>1.2</string>
+  <key>CFBundleVersion</key><string>3</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHumanReadableCopyright</key><string>BeamerFix</string>
 </dict></plist>
 PLIST
 
-codesign --force --sign - $APP
-codesign --force --sign - build/beamerfix
-echo "✓ $APP und build/beamerfix gebaut"
+if (( RELEASE )); then
+  SIGN_ID=${SIGN_ID:-$(security find-identity -v -p codesigning | awk -F'"' '/Developer ID Application/ {print $2; exit}')}
+  NOTARY_PROFILE=${NOTARY_PROFILE:-beamerfix-notary}
+  [[ -n $SIGN_ID ]] || { echo "✗ Kein 'Developer ID Application'-Zertifikat gefunden"; exit 1; }
+  echo "→ Signiere mit: $SIGN_ID"
+  # Hardened Runtime + sicherer Zeitstempel sind Pflicht für die Notarisierung
+  codesign --force --options runtime --timestamp --sign "$SIGN_ID" build/beamerfix
+  codesign --force --options runtime --timestamp --sign "$SIGN_ID" $APP
+  codesign --verify --strict --deep $APP
 
-if [[ "$1" == "install" ]]; then
+  echo "→ Notarisiere (dauert meist 1–5 Minuten) …"
+  ditto -c -k --keepParent $APP build/notarize.zip
+  xcrun notarytool submit build/notarize.zip --keychain-profile "$NOTARY_PROFILE" --wait
+  xcrun stapler staple $APP
+  rm build/notarize.zip
+
+  # Ticket an die App geheftet → auch offline ohne Warnung. Zum Verteilen dieses ZIP nehmen:
+  ditto -c -k --keepParent $APP build/BeamerFix.zip
+  spctl --assess --type execute -v $APP
+  echo "✓ Notarisiert: build/BeamerFix.zip"
+else
+  codesign --force --sign - $APP
+  codesign --force --sign - build/beamerfix
+  echo "✓ $APP und build/beamerfix gebaut (ad-hoc signiert)"
+fi
+
+if (( INSTALL )); then
   pkill -x BeamerFix 2>/dev/null || true
   rm -rf /Applications/BeamerFix.app
   cp -R $APP /Applications/
