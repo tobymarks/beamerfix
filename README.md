@@ -31,8 +31,11 @@ angeschlossenen 4K-TV macht macOS es selbst richtig.
 
 ## Installation
 
-**Einfach:** Unter [Releases](https://github.com/tobymarks/beamerfix/releases/latest) `BeamerFix.zip`
-laden, entpacken, nach *Programme* ziehen. Signiert und von Apple notarisiert – keine Warnung beim Start.
+**Einfach:** Unter [Releases](https://github.com/tobymarks/beamerfix/releases/latest) `BeamerFix.dmg`
+laden, öffnen und BeamerFix auf den Programme-Ordner ziehen. Signiert und von Apple notarisiert –
+keine Warnung beim Start.
+
+<p align="center"><img src="docs/dmg-window.png" width="450" alt="Installationsfenster der DMG"></p>
 
 **Aus dem Quellcode:**
 
@@ -52,7 +55,7 @@ wurde. Für eine weitergebbare Version:
 # einmalig: API-Key aus App Store Connect als notarytool-Profil hinterlegen
 xcrun notarytool store-credentials beamerfix-notary --key AuthKey_XXX.p8 --key-id XXX --issuer <Issuer-UUID>
 
-./build.sh release        # Developer ID signieren, notarisieren, stapeln → build/BeamerFix.zip
+./build.sh release        # App + DMG signieren, notarisieren, stapeln → build/BeamerFix.dmg
 ```
 
 ## Kommandozeilen-Tool
@@ -78,5 +81,7 @@ Displays und ändert weder Farbformat noch HDR-Signalisierung. Bietet der Ingest
 Sources/main.swift      Menüleisten-App (AppKit, CoreGraphics, ServiceManagement)
 cli/beamerfix.swift     Kommandozeilen-Tool
 icon/make-icon.swift    erzeugt icon/AppIcon.icns
+dmg/make-dmg.sh         baut die Installations-DMG (Fensterlayout per Finder/AppleScript)
+dmg/make-background.swift  erzeugt dmg/background.tiff (1x + 2x)
 build.sh                Build + Installation
 ```

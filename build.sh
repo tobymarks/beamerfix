@@ -3,7 +3,7 @@
 # und das Kommandozeilen-Tool build/beamerfix.
 #   ./build.sh            nur bauen (ad-hoc signiert, nur für diesen Mac)
 #   ./build.sh install    bauen und nach /Applications kopieren
-#   ./build.sh release    mit Developer ID signieren, notarisieren, stapeln → build/BeamerFix.zip
+#   ./build.sh release    mit Developer ID signieren, notarisieren, stapeln → build/BeamerFix.dmg
 #   ./build.sh release install
 #
 # Release braucht: ein „Developer ID Application“-Zertifikat im Schlüsselbund und ein
@@ -39,8 +39,8 @@ cat > $APP/Contents/Info.plist <<PLIST
   <key>CFBundleExecutable</key><string>BeamerFix</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.2</string>
-  <key>CFBundleVersion</key><string>3</string>
+  <key>CFBundleShortVersionString</key><string>1.3</string>
+  <key>CFBundleVersion</key><string>4</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHumanReadableCopyright</key><string>BeamerFix</string>
@@ -63,10 +63,15 @@ if (( RELEASE )); then
   xcrun stapler staple $APP
   rm build/notarize.zip
 
-  # Ticket an die App geheftet → auch offline ohne Warnung. Zum Verteilen dieses ZIP nehmen:
-  ditto -c -k --keepParent $APP build/BeamerFix.zip
   spctl --assess --type execute -v $APP
-  echo "✓ Notarisiert: build/BeamerFix.zip"
+
+  # Installations-DMG (Drag & Drop in Programme), ebenfalls signiert + notarisiert
+  echo "→ Baue DMG …"
+  dmg/make-dmg.sh $APP build/BeamerFix.dmg "$SIGN_ID"
+  xcrun notarytool submit build/BeamerFix.dmg --keychain-profile "$NOTARY_PROFILE" --wait
+  xcrun stapler staple build/BeamerFix.dmg
+  spctl --assess --type open --context context:primary-signature -v build/BeamerFix.dmg
+  echo "✓ Notarisiert: build/BeamerFix.dmg"
 else
   codesign --force --sign - $APP
   codesign --force --sign - build/beamerfix
