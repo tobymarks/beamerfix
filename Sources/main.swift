@@ -74,6 +74,9 @@ enum Displays {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var originals: [CGDirectDisplayID: Mode] = [:]   // leer = nicht aktiv
+    /// Offener Dialog. Solange er da ist, startet ein Klick nichts Neues, sondern holt ihn nach vorn –
+    /// sonst stapeln sich Rückfragen (runModal verarbeitet Menüleisten-Klicks weiter).
+    private var openAlert: NSAlert?
 
     func applicationDidFinishLaunching(_ note: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -95,6 +98,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func clicked() {
+        if let a = openAlert {
+            NSApp.activate(ignoringOtherApps: true)
+            a.window.makeKeyAndOrderFront(nil)
+            return
+        }
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
             menu.autoenablesItems = false   // sonst überschreibt AppKit isEnabled
@@ -195,7 +203,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         RunLoop.main.add(timer, forMode: .modalPanel)
         NSApp.activate(ignoringOtherApps: true)
+        openAlert = a
         let result = a.runModal()
+        openAlert = nil
         timer.invalidate()
         return result == .alertFirstButtonReturn
     }
@@ -205,7 +215,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         a.messageText = title
         a.informativeText = text
         NSApp.activate(ignoringOtherApps: true)
+        openAlert = a
         a.runModal()
+        openAlert = nil
     }
 }
 
